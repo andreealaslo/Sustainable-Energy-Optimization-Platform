@@ -1,0 +1,67 @@
+server:
+  # The external port exposed in docker-compose (8080)
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            # Route 1: Secured UserService Endpoints (Requires JWT Filter)
+            - id: user_service_secured
+              uri: http://user-service:8081
+              predicates:
+                - Path=/api/users/**
+              filters:
+                - StripPrefix=1
+                - name: JwtAuthenticationFilter
+
+            # Route 2: Public Health Check Route (Unsecured)
+            - id: user_service_health
+              uri: http://user-service:8081
+              predicates:
+                - Path=/users/health
+
+            # Route 3: Public Auth Routes (Login/Register - Unsecured)
+            - id: user_service_auth_post
+              uri: http://user-service:8081
+              predicates:
+                - Path=/users/register
+                - Method=POST
+
+            - id: user_service_auth_login
+              uri: http://user-service:8081
+              predicates:
+                - Path=/users/login
+                - Method=POST
+
+            # --- BILLING SERVICE ROUTING (Secured Ingestion) ---
+            - id: billing_service_ingestion
+              uri: http://billing-service:8082
+              predicates:
+                - Path=/api/billing/**
+              filters:
+                # Strip the /api prefix before forwarding
+                - StripPrefix=1
+                # Secure this API endpoint with the JWT filter
+                - name: JwtAuthenticationFilter
+                  args: {}
+
+            # --- BILLING SERVICE HEALTH CHECK (Public) ---
+            - id: billing_service_public
+              uri: http://billing-service:8082
+              predicates:
+                - Path=/billing/health
+
+# --- JWT Configuration (Used by the JwtUtil and Filter) ---
+# This key MUST match the one in the UserService to validate tokens.
+jwt:
+  secretKey: YmFzZTY0X2VuY29kZWRfc3VwZXJfc2VjcmV0X2tleV9mb3Jfc29hX3Byb2plY3RfMjAyNA==
+
+logging:
+  level:
+    org.springframework.security: DEBUG

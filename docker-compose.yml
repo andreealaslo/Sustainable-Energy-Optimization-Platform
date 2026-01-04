@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+
+  # --- Required for all phases ---
+
+  # 1. Database (PostgreSQL)
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: student
+      POSTGRES_DB: soa_db
+    ports:
+      - "55432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Nginx Load Balancer (Placeholder for Scalability & API Entry)
+  # In k8s, this role is taken by the Ingress Controller/Service Mesh.
+  # For now, it will reverse-proxy requests to the API Gateway.
+  nginx:
+    image: nginx:stable-alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+    volumes:
+      # Placeholder Nginx configuration file will route traffic to the API Gateway
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    restart: always
+
+  # # 3. API Gateway (The secured REST entry point)
+  # api-gateway:
+  #   # Use your Spring Boot Docker image name here
+  #   build: ./api-gateway/api-gateway
+  #   image: api-gateway-app:latest
+  #   container_name: api-gateway
+  #   environment:
+  #     # Example: Define the internal route to the UserService
+  #     USER_SERVICE_URI: http://user-service:8081
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     - user-service # Wait until the UserService is available
+
+  api-gateway:
+    build:
+      context: ./api-gateway/api-gateway
+      dockerfile: Dockerfile
+    image: api-gateway-app:latest
+    container_name: api-gateway
+    environment:
+      USER_SERVICE_URL: http://user-service:8081
+      BILLING_SERVICE_URL: http://billing-service:8082
+      JWT_SECRET_KEY: "YmFzZTY0X2VuY29kZWRfc3VwZXJfc2VjcmV0X2tleV9mb3Jfc29hX3Byb2plY3RfMjAyNA=="
+    ports:
+      - "8080:8080"
+    healthcheck:
+      # Verifies the gateway is listening AND routing correctly before Nginx connects
+      test: ["CMD", "curl", "-f", "http://localhost:8080/users/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      - postgres
+      - kafka
+      - user-service    # Added back: Gateway routes to this
+      - billing-service # Added: Gateway routes to this
+
+
+  # 4. UserService (Microservice #1 - Focus of Phase 1)
+  user-service:
+    build:
+      context: ./user-service/user-service
+      dockerfile: Dockerfile
+    image: user-service-app:latest
+    container_name: user-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/soa_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: student
+      SERVER_PORT: 8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    # --- Infrastructure for Event Streaming (Phase 2) ---
+
+   # 5. BillingService (Microservice #2 - Phase 2)
+  billing-service:
+    build:
+      context: ./billing-service/billing-service
+      dockerfile: Dockerfile
+    image: billing-service-app:latest
+    container_name: billing-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/soa_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: student
+      SERVER_PORT: 8082
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    hostname: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    hostname: kafka
+    ports:
+      # External client port: Connect to localhost:29092
+      - "29092:29092" 
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      # CRITICAL: Connect to the Zookeeper service by its name and port
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181' 
+      
+      # --- Listener Configuration ---
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # 6. RecommendationService (Microservice #3 - Phase 3)
+  # recommendation-service:
+  #   # build: ./recommendation-service
+  #   image: recommendation-service-app:latest
+  #   container_name: recommendation-service
+    # Omitted for Phase 1: dependencies, ports, and environment
+
+  
+  # 8. Message Broker (RabbitMQ - Phase 3)
+  # rabbitmq:
+  #   image: rabbitmq:3-management
+  #   container_name: rabbitmq
+  #   ports:
+  #     - "5672:5672" # AMQP protocol port
+  #     - "15672:15672" # Management UI
+
+volumes:
+  postgres_data:
