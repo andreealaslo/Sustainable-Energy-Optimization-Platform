@@ -90,6 +90,7 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: student
       SERVER_PORT: 8081
+      JWT_SECRET_KEY: "YmFzZTY0X2VuY29kZWRfc3VwZXJfc2VjcmV0X2tleV9mb3Jfc29hX3Byb2plY3RfMjAyNA=="
     ports:
       - "8081:8081"
     depends_on:
@@ -149,12 +150,27 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-  # 6. RecommendationService (Microservice #3 - Phase 3)
-  # recommendation-service:
-  #   # build: ./recommendation-service
-  #   image: recommendation-service-app:latest
-  #   container_name: recommendation-service
-    # Omitted for Phase 1: dependencies, ports, and environment
+  recommendation-service:
+    build: ./recommendation-service/recommendation-service
+    container_name: recommendation-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/soa_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: student
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVER_PORT: 8083
+    ports:
+      - "8083:8083"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/recommendations/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
 
   
   # 8. Message Broker (RabbitMQ - Phase 3)

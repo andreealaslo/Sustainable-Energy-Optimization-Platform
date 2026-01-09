@@ -12,7 +12,8 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
     // Custom query method generated automatically by Spring Data JPA
-    Optional<User> findByUserId(String userId);
-    // *** ADD THIS LINE FOR LOGIN ***
+
     Optional<User> findByEmail(String email);
+
+    Optional<User> findById(String authId);
 }

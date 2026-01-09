@@ -41,7 +41,7 @@ public class JwtUtil {
         SecretKey signingKey = getSigningKey();
 
         return Jwts.builder()
-                .subject(user.getUserId()) // Use the new subject method
+                .subject(user.getId()) // Use the new subject method
                 .issuedAt(now)
                 .expiration(expiryDate)
                 // Use the new signWith(SecretKey) method

@@ -19,7 +19,8 @@ public class ConsumptionRecord {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // The unique ID from the UserService to link consumption to a user's property
+    // The property ID from the Properties table from the User Service, it is like the id of
+    // the meter used to measure the kwhUsed from an address of a user
     private String propertyId;
 
     private Double kwhUsed;

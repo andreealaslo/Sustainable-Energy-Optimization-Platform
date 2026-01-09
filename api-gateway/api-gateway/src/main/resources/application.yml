@@ -57,6 +57,20 @@ spring:
               predicates:
                 - Path=/billing/health
 
+                  # --- RECOMMENDATION SERVICE ---
+            - id: recommendation_service_public
+              uri: http://recommendation-service:8083
+              predicates:
+                - Path=/recommendations/health
+
+            - id: recommendation_service_secured
+              uri: http://recommendation-service:8083
+              predicates:
+                - Path=/api/recommendations/**
+              filters:
+                - StripPrefix=1
+                - name: JwtAuthenticationFilter
+
 # --- JWT Configuration (Used by the JwtUtil and Filter) ---
 # This key MUST match the one in the UserService to validate tokens.
 jwt:
@@ -65,3 +79,6 @@ jwt:
 logging:
   level:
     org.springframework.security: DEBUG
+    org.springframework.cloud.gateway: TRACE
+    org.springframework.http.server.reactive: DEBUG
+    org.springframework.web.reactive: DEBUG
