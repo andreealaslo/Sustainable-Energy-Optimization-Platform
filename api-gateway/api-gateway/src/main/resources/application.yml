@@ -71,6 +71,19 @@ spring:
                 - StripPrefix=1
                 - name: JwtAuthenticationFilter
 
+              # --- NOTIFICATION SERVICE ---
+              # Protocol is 'ws' for the WebSocket handshake
+            - id: notification_service_ws
+              uri: ws://notification-service:8084
+              predicates:
+                - Path=/ws-notifications/**
+
+            - id: notification_service_public
+              uri: http://notification-service:8084
+              predicates:
+                - Path=/notifications/health
+
+
 # --- JWT Configuration (Used by the JwtUtil and Filter) ---
 # This key MUST match the one in the UserService to validate tokens.
 jwt:

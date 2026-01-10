@@ -61,6 +61,8 @@ services:
     environment:
       USER_SERVICE_URL: http://user-service:8081
       BILLING_SERVICE_URL: http://billing-service:8082
+      RECOMMENDATION_SERVICE_URL: http://recommendation-service:8083
+      NOTIFICATION_SERVICE_URL: http://notification-service:8084
       JWT_SECRET_KEY: "YmFzZTY0X2VuY29kZWRfc3VwZXJfc2VjcmV0X2tleV9mb3Jfc29hX3Byb2plY3RfMjAyNA=="
     ports:
       - "8080:8080"
@@ -72,10 +74,14 @@ services:
       retries: 10
       start_period: 30s
     depends_on:
-      - postgres
-      - kafka
-      - user-service    # Added back: Gateway routes to this
-      - billing-service # Added: Gateway routes to this
+      user-service:
+        condition: service_started
+      billing-service:
+        condition: service_started
+      recommendation-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
 
 
   # 4. UserService (Microservice #1 - Focus of Phase 1)
@@ -158,6 +164,7 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: student
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_RABBITMQ_HOST: rabbitmq
       SERVER_PORT: 8083
       FAAS_URL: http://carbon-calculator:8080
     ports:
@@ -172,6 +179,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
       carbon-calculator:
         condition: service_started
 
@@ -183,13 +192,27 @@ services:
       intensity_factor: "0.70"
 
   
-  # 8. Message Broker (RabbitMQ - Phase 3)
-  # rabbitmq:
-  #   image: rabbitmq:3-management
-  #   container_name: rabbitmq
-  #   ports:
-  #     - "5672:5672" # AMQP protocol port
-  #     - "15672:15672" # Management UI
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"   # RabbitMQ AMQP port
+      - "15672:15672" # RabbitMQ Management UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notification-service:
+    build: ./notification-service/notification-service
+    container_name: notification-service
+    environment:
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SERVER_PORT: 8084
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
 volumes:
   postgres_data:

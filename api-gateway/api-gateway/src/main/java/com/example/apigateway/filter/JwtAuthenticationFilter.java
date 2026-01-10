@@ -28,7 +28,9 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             "/users/register",
             "/users/login",
             "/users/health",
-            "/billing/health"
+            "/billing/health",
+            "/recommendations/health",
+            "/notifications/health"
     );
 
     @Autowired
