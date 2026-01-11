@@ -70,7 +70,7 @@ public class KafkaConsumerService {
         // --- STEP 2: DETERMINE STATUS & NOTIFY VIA RABBITMQ ---
         if (event.getKwhUsed() > 20.0) {
             recommendation.setStatus("RED");
-            recommendation.setRecommendationMessage("CRITICAL: High usage detected! Immediate action suggested.");
+            recommendation.setRecommendationMessage("High usage detected! Consider reducing load immediately.");
 
             // Construct Alert Payload for RabbitMQ
             Map<String, Object> alertPayload = Map.of(

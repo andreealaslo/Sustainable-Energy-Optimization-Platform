@@ -12,6 +12,8 @@ import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.server.WebFilter;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 /**
  * A global WebFilter to handle CORS across all routes (YAML and Java).
  * This version uses beforeCommit to ensure that downstream microservices
@@ -19,6 +21,12 @@ import reactor.core.publisher.Mono;
  */
 @Configuration
 public class GlobalCorsFilter {
+
+    // Define the list of trusted frontend origins
+    private static final List<String> ALLOWED_ORIGINS = List.of(
+            "http://localhost:3000",
+            "http://localhost:3001"
+    );
 
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -28,7 +36,7 @@ public class GlobalCorsFilter {
             String origin = request.getHeaders().getFirst(HttpHeaders.ORIGIN);
 
             // Only apply logic if the request comes from our React app
-            if (origin != null && origin.equals("http://localhost:3000")) {
+            if (origin != null && ALLOWED_ORIGINS.contains(origin)) {
                 ServerHttpResponse response = exchange.getResponse();
 
                 // --- THE FIX: Intercept the response headers right before commitment ---

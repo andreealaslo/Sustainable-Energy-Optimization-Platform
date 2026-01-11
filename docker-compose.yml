@@ -38,19 +38,6 @@ services:
         condition: service_healthy
     restart: always
 
-  # # 3. API Gateway (The secured REST entry point)
-  # api-gateway:
-  #   # Use your Spring Boot Docker image name here
-  #   build: ./api-gateway/api-gateway
-  #   image: api-gateway-app:latest
-  #   container_name: api-gateway
-  #   environment:
-  #     # Example: Define the internal route to the UserService
-  #     USER_SERVICE_URI: http://user-service:8081
-  #   ports:
-  #     - "8080:8080"
-  #   depends_on:
-  #     - user-service # Wait until the UserService is available
 
   api-gateway:
     build:

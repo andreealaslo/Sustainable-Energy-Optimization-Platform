@@ -76,7 +76,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
     }
 
     private boolean isPublic(String path) {
-        return PUBLIC_ROUTES.stream().anyMatch(p -> path.equals(p) || path.startsWith(p));
+        return PUBLIC_ROUTES.stream().anyMatch(p -> path.equals(p) || path.startsWith(p + "/"));
     }
 
     // Helper method to respond with an error message
