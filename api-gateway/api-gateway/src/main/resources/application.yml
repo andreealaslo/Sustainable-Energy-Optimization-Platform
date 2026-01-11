@@ -74,7 +74,7 @@ spring:
               # --- NOTIFICATION SERVICE ---
               # Protocol is 'ws' for the WebSocket handshake
             - id: notification_service_ws
-              uri: ws://notification-service:8084
+              uri: http://notification-service:8084
               predicates:
                 - Path=/ws-notifications/**
 
@@ -82,6 +82,7 @@ spring:
               uri: http://notification-service:8084
               predicates:
                 - Path=/notifications/health
+
 
 
 # --- JWT Configuration (Used by the JwtUtil and Filter) ---

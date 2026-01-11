@@ -202,7 +202,8 @@ services:
       test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10 # Increase this to 10 (100 seconds total)
+      start_period: 30s # Give it a 30s grace period before starting checks
 
   notification-service:
     build: ./notification-service/notification-service
