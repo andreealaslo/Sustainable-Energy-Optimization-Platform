@@ -13,24 +13,16 @@ import org.springframework.security.web.server.context.NoOpServerSecurityContext
  * This ensures that public routes (like health and login) bypass Spring Security's default login form.
  */
 @Configuration
-@EnableWebFluxSecurity // Required for WebFlux-based security configuration
+@EnableWebFluxSecurity
 public class SecurityConfig {
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         return http
-                // Gateway auth is handled by Spring Cloud Gateway filters (JwtAuthenticationFilter),
-                // not by Spring Security.
                 .authorizeExchange(exchanges -> exchanges.anyExchange().permitAll())
-
-                // Avoid browser popup / login pages
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-
-                // Stateless
                 .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
-
-                // API gateway, no CSRF
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .build();
     }

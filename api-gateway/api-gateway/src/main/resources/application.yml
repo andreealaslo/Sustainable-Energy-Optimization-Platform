@@ -11,7 +11,6 @@ spring:
       server:
         webflux:
           routes:
-            # Route 1: Secured UserService Endpoints (Requires JWT Filter)
             - id: user_service_secured
               uri: http://user-service:8081
               predicates:
@@ -20,13 +19,11 @@ spring:
                 - StripPrefix=1
                 - name: JwtAuthenticationFilter
 
-            # Route 2: Public Health Check Route (Unsecured)
             - id: user_service_health
               uri: http://user-service:8081
               predicates:
                 - Path=/users/health
 
-            # Route 3: Public Auth Routes (Login/Register - Unsecured)
             - id: user_service_auth_post
               uri: http://user-service:8081
               predicates:
@@ -39,25 +36,20 @@ spring:
                 - Path=/users/login
                 - Method=POST
 
-            # --- BILLING SERVICE ROUTING (Secured Ingestion) ---
             - id: billing_service_ingestion
               uri: http://billing-service:8082
               predicates:
                 - Path=/api/billing/**
               filters:
-                # Strip the /api prefix before forwarding
                 - StripPrefix=1
-                # Secure this API endpoint with the JWT filter
                 - name: JwtAuthenticationFilter
                   args: {}
 
-            # --- BILLING SERVICE HEALTH CHECK (Public) ---
             - id: billing_service_public
               uri: http://billing-service:8082
               predicates:
                 - Path=/billing/health
 
-                  # --- RECOMMENDATION SERVICE ---
             - id: recommendation_service_public
               uri: http://recommendation-service:8083
               predicates:
@@ -71,8 +63,6 @@ spring:
                 - StripPrefix=1
                 - name: JwtAuthenticationFilter
 
-              # --- NOTIFICATION SERVICE ---
-              # Protocol is 'ws' for the WebSocket handshake
             - id: notification_service_ws
               uri: http://notification-service:8084
               predicates:
@@ -84,9 +74,6 @@ spring:
                 - Path=/notifications/health
 
 
-
-# --- JWT Configuration (Used by the JwtUtil and Filter) ---
-# This key MUST match the one in the UserService to validate tokens.
 jwt:
   secretKey: YmFzZTY0X2VuY29kZWRfc3VwZXJfc2VjcmV0X2tleV9mb3Jfc29hX3Byb2plY3RfMjAyNA==
 

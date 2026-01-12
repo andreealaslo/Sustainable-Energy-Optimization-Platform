@@ -8,20 +8,17 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey; // Important: Need to import SecretKey
+import javax.crypto.SecretKey;
 /**
  * Utility class for handling JSON Web Token (JWT) operations: validation and claim extraction.
  */
 @Component
 public class JwtUtil {
-
-    // Change the type to SecretKey to match the new JJWT API
     private final SecretKey key;
 
     @Autowired
     public JwtUtil(JwtConfig jwtConfig) {
         byte[] keyBytes = Decoders.BASE64.decode(jwtConfig.getSecretKey());
-        // Keys.hmacShaKeyFor returns SecretKey
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
 
@@ -32,11 +29,10 @@ public class JwtUtil {
      */
     public Claims getAllClaimsFromToken(String token) {
         return Jwts.parser()
-                // Use verifyWith(SecretKey) instead of setSigningKey(Key)
                 .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)
-                .getPayload(); // Get the Claims object
+                .getPayload();
     }
 
     /**
@@ -46,21 +42,19 @@ public class JwtUtil {
      */
     public boolean isTokenValid(String token) {
         try {
-            // Re-use the new parsing structure for validation
             Jwts.parser()
                     .verifyWith(key)
                     .build()
                     .parseSignedClaims(token);
             return true;
         } catch (Exception e) {
-            // Log the exception (e.g., token expired, bad signature)
             System.err.println("JWT Validation Failed: " + e.getMessage());
             return false;
         }
     }
 
     /**
-     * Extracts the subject (usually the userId) from the token.
+     * Extracts the subject from the token.
      */
     public String getUserIdFromToken(String token) {
         return getAllClaimsFromToken(token).getSubject();

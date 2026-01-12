@@ -12,6 +12,5 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "jwt")
 @Data
 public class JwtConfig {
-    // This value will be set in application.yml
     private String secretKey;
 }

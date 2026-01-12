@@ -21,9 +21,6 @@ import java.util.List;
 public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAuthenticationFilter.Config> {
 
     private final JwtUtil jwtUtil;
-
-    // We define a list of public/unsecured routes here as a fallback,
-    // though Spring Cloud Gateway configuration usually handles this.
     public static final List<String> PUBLIC_ROUTES = List.of(
             "/users/register",
             "/users/login",
@@ -79,7 +76,6 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
         return PUBLIC_ROUTES.stream().anyMatch(p -> path.equals(p) || path.startsWith(p + "/"));
     }
 
-    // Helper method to respond with an error message
     private Mono<Void> onError(ServerWebExchange exchange, HttpStatus status) {
         exchange.getResponse().setStatusCode(status);
         return exchange.getResponse().setComplete();
