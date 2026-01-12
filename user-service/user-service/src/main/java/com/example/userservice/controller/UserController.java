@@ -11,15 +11,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.UUID;
 import java.util.Map;
 
-/**
- * REST Controller for the UserService. All endpoints are internal
- * and accessed via the API Gateway.
- */
 @RestController
 @RequestMapping("/users")
 public class UserController {
@@ -37,32 +32,22 @@ public class UserController {
         this.jwtUtil = jwtUtil;
     }
 
-    // --- Public Health Check Endpoint ---
-    // Used by Kubernetes/Docker to check if the service is running
     @GetMapping("/health")
     public ResponseEntity<String> healthCheck() {
         return ResponseEntity.ok("UserService is up and running.");
     }
 
-    // --- Public Authentication Endpoints ---
-
-    // 1. Register a new user - RECEIVING DTO NOW
     @PostMapping("/register")
     public ResponseEntity<User> registerUser(@RequestBody RegistrationRequest request) {
-
-        // 1. Create and populate the JPA Entity from the DTO
         User user = new User();
         user.setEmail(request.getEmail());
         user.setFullName(request.getFullName());
 
-        // Simulating hash
         user.setPassword("DUMMY_HASH_" + request.getPassword());
         User savedUser = userRepository.save(user);
         return new ResponseEntity<>(savedUser, HttpStatus.CREATED);
     }
 
-
-    // 2. LOGIN ENDPOINT: Generates the JWT token
     @PostMapping("/login")
     public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest loginRequest) {
         return userRepository.findByEmail(loginRequest.getEmail())
@@ -74,21 +59,12 @@ public class UserController {
                 .orElse(new ResponseEntity<>(Map.of("error", "Invalid credentials"), HttpStatus.UNAUTHORIZED));
     }
 
-
-    // --- Secured Endpoints (Protected by API Gateway) ---
-
-    // 3. SECURED GET ENDPOINT: Retrieves user profile data
-    // The X-Auth-User-Id header is added by the API Gateway's JwtAuthenticationFilter
-    // --- Profile ---
-
     @GetMapping("/profile")
     public ResponseEntity<User> getProfile(@RequestHeader("X-Auth-User-Id") String authId) {
         return userRepository.findById(authId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-
-    // --- Property Management ---
 
     @PostMapping("/register-property")
     public ResponseEntity<Property> addProperty(
@@ -98,7 +74,7 @@ public class UserController {
         return userRepository.findById(authId).map(user -> {
             property.setOwner(user);
 
-            // Logic: Ensure a propertyId (Meter ID) exists
+            //if propertyID is not passed, a random one is generated
             if (property.getPropertyId() == null || property.getPropertyId().isBlank()) {
                 property.setPropertyId("METER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
             }

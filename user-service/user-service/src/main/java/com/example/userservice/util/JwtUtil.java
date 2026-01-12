@@ -1,13 +1,11 @@
 package com.example.userservice.util;
-
 import com.example.userservice.model.User;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import javax.crypto.SecretKey; // Important: Need to import SecretKey
+import javax.crypto.SecretKey;
 import java.util.Date;
 
 /**
@@ -22,10 +20,8 @@ public class JwtUtil {
     @Value("${jwt.expiration-ms}")
     private long expirationMs;
 
-    // Change to SecretKey
     private SecretKey getSigningKey() {
         byte[] keyBytes = Decoders.BASE64.decode(this.secretKey);
-        // Keys.hmacShaKeyFor returns SecretKey
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
@@ -41,10 +37,9 @@ public class JwtUtil {
         SecretKey signingKey = getSigningKey();
 
         return Jwts.builder()
-                .subject(user.getId()) // Use the new subject method
+                .subject(user.getId())
                 .issuedAt(now)
                 .expiration(expiryDate)
-                // Use the new signWith(SecretKey) method
                 .signWith(signingKey)
                 .compact();
     }

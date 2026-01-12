@@ -1,5 +1,4 @@
 package com.example.userservice.model;
-
 import jakarta.persistence.*;
 import lombok.Data;
 import java.util.List;
@@ -20,7 +19,6 @@ public class User {
 
     private String fullName;
 
-    // A user can own multiple properties
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL)
     private List<Property> properties;
 }
