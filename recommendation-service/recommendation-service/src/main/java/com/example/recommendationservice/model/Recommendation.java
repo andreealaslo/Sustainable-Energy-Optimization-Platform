@@ -16,8 +16,8 @@ public class Recommendation {
 
     private String propertyId;
     private Double kwhUsed;
-    private Double carbonScore; // Placeholder for FaaS result
+    private Double carbonScore;
     private String recommendationMessage;
-    private String status; // GREEN, YELLOW, RED
+    private String status;
     private LocalDateTime createdAt;
 }

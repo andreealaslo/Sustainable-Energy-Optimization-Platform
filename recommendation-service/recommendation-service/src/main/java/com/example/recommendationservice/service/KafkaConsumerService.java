@@ -25,7 +25,7 @@ public class KafkaConsumerService {
     private final RestTemplate restTemplate;
     private final RabbitTemplate rabbitTemplate;
 
-    // Pulls from the 'FAAS_URL' environment variable in docker-compose
+
     @Value("${FAAS_URL:http://carbon-calculator:8080}")
     private String faasUrl;
 
@@ -49,11 +49,8 @@ public class KafkaConsumerService {
         // --- STEP 1: CALL PYTHON FAAS ---
         try {
             log.info("Requesting calculation from FaaS: {}", faasUrl);
-
-            // Prepare the JSON payload for the Python function
             Map<String, Object> requestPayload = Map.of("kwh", event.getKwhUsed());
 
-            // POST request to the OpenFaaS watchdog
             Map<String, Object> response = restTemplate.postForObject(faasUrl, requestPayload, Map.class);
 
             if (response != null && response.containsKey("carbonScore")) {
@@ -63,7 +60,6 @@ public class KafkaConsumerService {
             }
         } catch (Exception e) {
             log.error("FaaS communication failed! Using local fallback. Error: {}", e.getMessage());
-            // Fallback math in case the FaaS container is down
             recommendation.setCarbonScore(event.getKwhUsed() * 0.45);
         }
 
@@ -71,8 +67,6 @@ public class KafkaConsumerService {
         if (event.getKwhUsed() > 20.0) {
             recommendation.setStatus("RED");
             recommendation.setRecommendationMessage("High usage detected! Consider reducing load immediately.");
-
-            // Construct Alert Payload for RabbitMQ
             Map<String, Object> alertPayload = Map.of(
                     "propertyId", event.getPropertyId(),
                     "kwhUsed", event.getKwhUsed(),
@@ -82,7 +76,6 @@ public class KafkaConsumerService {
             );
 
             log.info("Publishing RED Alert to RabbitMQ exchange 'alert-exchange'...");
-            // Use topic-based routing for flexibility
             rabbitTemplate.convertAndSend("alert-exchange", "alert.red", alertPayload);
 
         } else if (event.getKwhUsed() < 10.0) {
