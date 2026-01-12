@@ -8,10 +8,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 
-/**
- * REST controller for handling data ingestion (simulated utility readings).
- * This endpoint is typically secured by the API Gateway.
- */
 @RestController
 @RequestMapping("/billing")
 public class BillingController {
@@ -25,8 +21,6 @@ public class BillingController {
         this.kafkaProducerService = kafkaProducerService;
     }
 
-    // --- Secured Endpoint: Ingest New Reading ---
-    // The X-Auth-User-Id header would be used in a real scenario to verify the user owns the propertyId
     @PostMapping("/ingest")
     public ResponseEntity<ConsumptionRecord> ingestReading(
             @RequestBody ConsumptionRecord record,
@@ -38,8 +32,6 @@ public class BillingController {
 
         record.setReadingTimestamp(LocalDateTime.now());
         record.setProcessed(false);
-
-        // 1. Initial Save
         ConsumptionRecord savedRecord = repository.save(record);
 
         try {
@@ -49,16 +41,13 @@ public class BillingController {
             // 3. Update status to true since it was successfully sent to the stream
             savedRecord.setProcessed(true);
             repository.save(savedRecord);
-
             return ResponseEntity.status(201).body(savedRecord);
         } catch (Exception e) {
             // If Kafka fails, the record remains in DB with processed = false
-            // This allows for future "retry" logic
             return ResponseEntity.status(500).body(savedRecord);
         }
     }
 
-    // --- Health Check ---
     @GetMapping("/health")
     public ResponseEntity<String> healthCheck() {
         return ResponseEntity.ok("BillingService is up and running.");

@@ -15,7 +15,6 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class KafkaProducerService {
 
-    // Define the Kafka Topic name
     private static final String TOPIC_NAME = "raw-consumption-events";
 
     private final KafkaTemplate<String, ConsumptionRecord> kafkaTemplate;
