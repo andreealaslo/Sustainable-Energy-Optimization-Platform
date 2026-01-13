@@ -31,6 +31,8 @@ Built with Spring Cloud Gateway, it serves as the single entry point. It impleme
 - Extracts the User ID.
 - Injects *X-Auth-User-Id* into the request headers for downstream services.
 
+![Alt text](assets/images/APIGatewayDiagram.png)
+
 ### **Database**
 A shared **PostgreSQL** instance is used across microservices. Each service manages its own logical tables (Users, Properties, Consumption Records, Recommendations) to ensure data ownership and service independence.
 
@@ -71,6 +73,8 @@ The producer of the event stream.
 - Public: `GET /billing/health` - Health Check.
 - Secured REST: `POST /api/billing/ingest` – Submit kWh usage. Data is saved locally and then streamed to Kafka.
 
+![Alt text](assets/images/BillingServiceDiagram.png)
+
 ### **3. Recommendation  Service**
 The consumer and recommendation engine.
 - Kafka Listener: Monitors raw-consumption-events.
@@ -78,11 +82,15 @@ The consumer and recommendation engine.
 - Alert Trigger: Sends messages to RabbitMQ if usage is excessive.
 - Public: `GET /recommendations/health` - Health Check.
 - Secured REST: `POST /api/recommendations/property/{propertyID}` – Returns history recommendations for the property with the corresponding ID.
+
+![Alt text](assets/images/RecommendationServiceDiagram.png)
   
 ### **4. Notification  Service**
 The real-time hub.
 - Rabbit Listener: Monitors alert-queue.
 - WebSocket Server: Broadcasts messages to /topic/notifications.
+
+![Alt text](assets/images/NotificationServiceDiagram.png)
   
 ## **Deployment & Setup**
 ### **Prerequisites**:
