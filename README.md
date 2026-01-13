@@ -6,43 +6,6 @@ The platform is a fully containerized, microservice-based system designed to mon
 
 The system leverages a robust backend built with <ins>Java Spring Boot</ins>, secured <ins>REST</ins> endpoints, a microfrontend architecture using <ins>React</ins> and <ins>Module Federation</ins> and an <ins>Nginx API Gateway</ins> for centralized security and request routing. Event streaming is made by <ins>Kafka</ins>, asynchronous communication is handled via <ins>RabbitMQ</ins>, while real-time user alerts are pushed through <ins>WebSockets</ins>. Security is enforced via <ins>JWT-based authentication</ins>. Database used is <ins>PostgreSQL</ins>, shared across the microservices. The carbon score is calculated using a function build with <ins>OpenFaas</ins>. All the backend services are in a <ins>Docket<ins> container. 
 
-graph TD
-    UI[Microfrontend UI<br/>React Shell + Dashboard]
-
-    APIGW[API Gateway]
-
-    UserSvc[User Service]
-    BillingSvc[Billing Service]
-    RecSvc[Recommendation Service]
-    NotifSvc[Notification Service]
-
-    Kafka[Apache Kafka]
-    Rabbit[RabbitMQ]
-
-    FaaS[Carbon Calculator<br/>OpenFaaS]
-    DB[(PostgreSQL)]
-
-    UI --> APIGW
-
-    APIGW --> UserSvc
-    APIGW --> BillingSvc
-    APIGW --> RecSvc
-    APIGW --> NotifSvc
-
-    BillingSvc --> Kafka
-    Kafka --> RecSvc
-
-    RecSvc --> FaaS
-    RecSvc --> Rabbit
-
-    Rabbit --> NotifSvc
-    NotifSvc --> UI
-
-    UserSvc --> DB
-    BillingSvc --> DB
-    RecSvc --> DB
-
-
 ## **Key Features**
 
 - **Microservice Architecture**: Decoupled services for users, billing, recommendations, and notifications.
@@ -52,6 +15,8 @@ graph TD
 - **Serverless Computing**: Python-based FaaS for isolated carbon footprint calculations.
 - **Real-Time Notifications**: WebSocket integration for instant "High Usage" alerts, consumed from RabbitMQ.
 - **Containerization**: Full deployment via Docker and Docker Compose.
+
+![Alt text](assets/images/SystemDiagram.png)
 
 ## **Application Components**
 
