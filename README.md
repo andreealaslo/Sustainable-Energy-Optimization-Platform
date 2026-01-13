@@ -63,6 +63,8 @@ Responsible for identity and assets.
 - Secured REST: `GET /api/users/profile` – Returns user entity.
 - Secured REST: `POST /api/users/register-property` - Register a user's property (usually an address).
 - Secured REST: `GET /api/users/properties` – List all properties linked to the authenticated user.
+
+![Alt text](assets/images/User Service Diagram.png)
   
 ### **2. Billing  Service**
 The producer of the event stream.
