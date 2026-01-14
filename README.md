@@ -16,7 +16,7 @@ The system leverages a robust backend built with <ins>Java Spring Boot</ins>, se
 - **Real-Time Notifications**: WebSocket integration for instant "High Usage" alerts, consumed from RabbitMQ.
 - **Containerization**: Full deployment via Docker and Docker Compose.
 
-![Alt text](assets/images/SystemDiagram.png)
+![Alt text](assets/images/SystemDiagram.png) 
 
 ## **Application Components**
 
