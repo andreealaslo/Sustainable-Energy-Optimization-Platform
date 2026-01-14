@@ -166,7 +166,7 @@ services:
     container_name: carbon-calculator
     environment:
       # pass value to the function
-      intensity_factor: "0.70"
+      intensity_factor: "0.90"
 
   # 9. RabbitMQ
   rabbitmq:
