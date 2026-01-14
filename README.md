@@ -14,7 +14,7 @@ The system leverages a robust backend built with <ins>Java Spring Boot</ins>, se
 - **Asynchronous Messaging**: RabbitMQ handles the recommendation generation, consuming the event from Kafka.
 - **Serverless Computing**: Python-based FaaS for isolated carbon footprint calculations.
 - **Real-Time Notifications**: WebSocket integration for instant "High Usage" alerts, consumed from RabbitMQ.
-- **Containerization**: Full deployment via Docker and Docker Compose.
+- **Containerization**: Full backend deployment via Docker and Docker Compose.
 
 ![Alt text](assets/images/SystemDiagramUpdated.png) 
 
