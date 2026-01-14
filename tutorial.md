@@ -35,6 +35,8 @@ The core engine for sending data is the **KafkaTemplate**.
 - When .send() is called, it doesn't wait for the message to reach the server. Instead, it returns a CompletableFuture. This allows the BillingController to finish its task quickly while the message travels to the broker in the background.
 - I use the overload send(topic, key, value). By passing the propertyId as the key, KafkaTemplate ensures that all readings for a specific property are sent to the same partition, guaranteeing they are processed in chronological order.
 
+![Alt text](assets/images/kafka1.png)
+
 ### **Implementation**
 - **Keying**: Send propertyId as the Kafka Key.
 - **Results**: Used .whenComplete() to log whether the message successfully reached the broker or if an error occurred.
