@@ -4,7 +4,7 @@
 
 The platform is a fully containerized, microservice-based system designed to monitor energy consumption, calculate environmental impact (carbon scores) and provide smart recommendations for energy optimization.
 
-The system leverages a robust backend built with <ins>Java Spring Boot</ins>, secured <ins>REST</ins> endpoints, a microfrontend architecture using <ins>React</ins> and <ins>Module Federation</ins> and an <ins>Nginx API Gateway</ins> for centralized security and request routing. Event streaming is made by <ins>Kafka</ins>, asynchronous communication is handled via <ins>RabbitMQ</ins>, while real-time user alerts are pushed through <ins>WebSockets</ins>. Security is enforced via <ins>JWT-based authentication</ins>. Database used is <ins>PostgreSQL</ins>, shared across the microservices. The carbon score is calculated using a function build with <ins>OpenFaas</ins>. All the backend services are in a <ins>Docket<ins> container. 
+The system leverages a robust backend built with <ins>Java Spring Boot</ins>, secured <ins>REST</ins> endpoints, a microfrontend architecture using <ins>React</ins> and <ins>Module Federation</ins> and an <ins>API Gateway</ins> for centralized security and request routing. <ins>Nginx</ins> is used as a reverse proxy. Event streaming is made by <ins>Kafka</ins>, asynchronous communication is handled via <ins>RabbitMQ</ins>, while real-time user alerts are pushed through <ins>WebSockets</ins>. Security is enforced via <ins>JWT-based authentication</ins>. Database used is <ins>PostgreSQL</ins>, shared across the microservices. The carbon score is calculated using a function build with <ins>OpenFaas</ins>. All the backend services are in a <ins>Docket<ins> container. 
 
 ## **Key Features**
 
