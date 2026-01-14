@@ -41,6 +41,8 @@ The core engine for sending data is the **KafkaTemplate**.
 - **Keying**: Send propertyId as the Kafka Key.
 - **Results**: Used .whenComplete() to log whether the message successfully reached the broker or if an error occurred.
 
+![Alt text](assets/images/kafka2.png)
+
 ## **KafkaConsumerService class: Recommendation Service**
 The **KafkaConsumerService** class is the "listener" that waits for new messages to appear on the topic. 
 
@@ -55,6 +57,9 @@ A critical aspect of the **consumeConsumptionEvent** function is that it is auto
 - **FaaS Integration**: Sends the raw kWh to a Python-based Carbon Calculator function (OpenFaaS) to get a carbon score.
 - **RabbitMQ connection**: If usage is too high (hardcoded value by me), it switches communication protocols and sends a "RED Alert" message to RabbitMQ.
 - **Database persistence**: Saves the final recommendation to the PostgreSQL database.
+
+![Alt text](assets/images/kafka3.png)
+![Alt text](assets/images/kafka4.png)
 
 
 ## **Summary of the Data Flow**
