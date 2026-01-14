@@ -110,6 +110,7 @@ The real-time hub.
    - Dashboard Remote Frontend: `http://localhost:3001`
 
 ## **Technologies Used**
+- **Backend Reverse Proxy**: Nginx
 - **Backend**: Java Spring Boot, Spring Cloud Gateway
 - **Frontend**: React, Module Federation, Tailwind CSS
 - **Event Streaming**: Apache Kafka
