@@ -50,6 +50,14 @@ spring:
               predicates:
                 - Path=/billing/health
 
+            - id: billing_service_simulator
+              uri: http://billing-service:8082
+              predicates:
+                - Path=/api/billing/simulator/**
+              filters:
+                - name: JwtAuthenticationFilter
+                  args: {}
+
             - id: recommendation_service_public
               uri: http://recommendation-service:8083
               predicates:

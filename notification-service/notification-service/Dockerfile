@@ -6,7 +6,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:17-jre-alpine
-RUN apk add --no-cache curl
+RUN apk add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/v3.18/main/ curl
 WORKDIR /app
 COPY --from=build /app/target/*.jar notification-service.jar
 EXPOSE 8084

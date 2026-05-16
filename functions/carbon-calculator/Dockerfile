@@ -6,6 +6,11 @@ COPY --from=watchdog /fwatchdog /usr/bin/fwatchdog
 RUN chmod +x /usr/bin/fwatchdog
 
 WORKDIR /home/app
+# Copy the requirements file
+COPY requirements.txt .
+
+# Install the dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 COPY handler.py .
 
 ENV fprocess="python3 handler.py"
