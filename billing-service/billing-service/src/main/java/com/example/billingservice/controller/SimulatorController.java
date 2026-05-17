@@ -18,8 +18,20 @@ public class SimulatorController {
 
     @PostMapping("/start")
     public ResponseEntity<String> startSimulation(
-            @RequestParam(value = "propertyId", defaultValue = "simulated-property-1") String propertyId,
+            @RequestBody(required = false) java.util.Map<String, String> payload,
+            @RequestParam(value = "propertyId", required = false) String propertyIdParam,
             @RequestHeader(value = "X-Auth-User-Id", required = false) String authenticatedUserId) {
+
+        String propertyId = null;
+        if (payload != null) {
+            propertyId = payload.get("propertyId");
+        }
+        if (propertyId == null || propertyId.isBlank()) {
+            propertyId = propertyIdParam;
+        }
+        if (propertyId == null || propertyId.isBlank()) {
+            propertyId = "simulated-property-1";
+        }
 
         simulatorService.startSimulation(propertyId);
         return ResponseEntity.ok("Simulator started for property: " + propertyId);

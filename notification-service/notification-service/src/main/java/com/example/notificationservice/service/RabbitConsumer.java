@@ -32,7 +32,7 @@ public class RabbitConsumer {
      */
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(value = "alert-queue", durable = "true"),
-            exchange = @Exchange(value = "alert-exchange", type = "topic"),
+            exchange = @Exchange(value = "alert-exchange", type = "topic", durable = "true"),
             key = {"alert.red", "chart.refresh"} // <--- Binds both routing keys to this queue
     ))
     public void handleIncomingEvent(Map<String, Object> eventData) {
