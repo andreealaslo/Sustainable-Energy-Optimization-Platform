@@ -46,6 +46,7 @@ public class KafkaConsumerService {
         recommendation.setKwhUsed(event.getKwhUsed());
         recommendation.setCreatedAt(LocalDateTime.now());
         String gridIndex = "unknown";
+        String advice = null;
 
         // --- STEP 1: CALL PYTHON FAAS ---
         try {
@@ -62,6 +63,9 @@ public class KafkaConsumerService {
                 Double score = Double.valueOf(response.get("carbonScore").toString());
                 String dataSource = response.get("dataSource").toString();
                 gridIndex = response.get("gridIndex").toString();
+                if (response.containsKey("advice")) {
+                    advice = response.get("advice").toString();
+                }
                 recommendation.setCarbonScore(score);
                 recommendation.setStatus(gridIndex);
                 log.info("FaaS returned Carbon Score: {} and Grid Index: {} (Data Source: {})", score, gridIndex,
@@ -87,15 +91,20 @@ public class KafkaConsumerService {
                 recommendation.setRecommendationMessage("High usage detected! Consider reducing load immediately.");
             }
             
-            Map<String, Object> alertPayload = Map.of(
-                    "type", "ALERT",
-                    "propertyId", event.getPropertyId(),
-                    "kwhUsed", event.getKwhUsed(),
-                    "carbonScore", recommendation.getCarbonScore(),
-                    "gridIndex", gridIndex,
-                    "timestamp", LocalDateTime.now().toString());
+            java.util.Map<String, Object> alertPayload = new java.util.HashMap<>();
+            alertPayload.put("type", "ALERT");
+            alertPayload.put("propertyId", event.getPropertyId());
+            alertPayload.put("kwhUsed", event.getKwhUsed());
+            alertPayload.put("carbonScore", recommendation.getCarbonScore());
+            alertPayload.put("gridIndex", gridIndex);
+            alertPayload.put("timestamp", LocalDateTime.now().toString());
+            if (advice != null) {
+                alertPayload.put("advice", advice);
+            }
             
             log.info(msg);
+            log.info("Advice: {}", advice != null ? advice : "No advice provided by FaaS.");
+
             // Uses routing key alert.red for the loud UI popup
             rabbitTemplate.convertAndSend("alert-exchange", "alert.red", alertPayload);
 
@@ -108,14 +117,18 @@ public class KafkaConsumerService {
             }
 
             // Construct a lightweight Silent Refresh Payload
-            Map<String, Object> refreshPayload = Map.of(
-                    "type", "DATA_REFRESH",
-                    "propertyId", event.getPropertyId(),
-                    "kwhUsed", event.getKwhUsed(),
-                    "carbonScore", recommendation.getCarbonScore(),
-                    "gridIndex", gridIndex,
-                    "timestamp", LocalDateTime.now().toString());
+            java.util.Map<String, Object> refreshPayload = new java.util.HashMap<>();
+            refreshPayload.put("type", "DATA_REFRESH");
+            refreshPayload.put("propertyId", event.getPropertyId());
+            refreshPayload.put("kwhUsed", event.getKwhUsed());
+            refreshPayload.put("carbonScore", recommendation.getCarbonScore());
+            refreshPayload.put("gridIndex", gridIndex);
+            refreshPayload.put("timestamp", LocalDateTime.now().toString());
+            if (advice != null) {
+                refreshPayload.put("advice", advice);
+            }
 
+            log.info("Advice: {}", advice != null ? advice : "No advice provided by FaaS.");
             log.info("Publishing SILENT Data Refresh to RabbitMQ for chart update...");
             // Use a separate routing key (e.g., chart.refresh) so the UI can separate the intents
             rabbitTemplate.convertAndSend("alert-exchange", "chart.refresh", refreshPayload);
