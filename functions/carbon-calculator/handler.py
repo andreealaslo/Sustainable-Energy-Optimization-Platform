@@ -5,7 +5,6 @@ import requests
 from datetime import datetime, timezone, timedelta
 
 BASE_URL = "https://api.carbonintensity.org.uk"
-# /tmp is persistent for the life of the container
 CACHE_FILE = "/tmp/carbon_cache.json"
 CACHE_DURATION = timedelta(minutes=30)
 
@@ -17,7 +16,7 @@ def handle(req):
         grid_index = "unknown"
         
         cached_data = None
-        # --- TRY TO READ CACHE FROM FILE ---
+        # --- READ CACHE FROM FILE ---
         if os.path.exists(CACHE_FILE):
             try:
                 with open(CACHE_FILE, 'r') as f:
@@ -35,7 +34,7 @@ def handle(req):
                             except Exception:
                                 pass
             except Exception:
-                pass # If file is corrupt, we'll just fetch new data
+                pass 
 
         if cached_data:
             live_intensity = cached_data["live_intensity"]

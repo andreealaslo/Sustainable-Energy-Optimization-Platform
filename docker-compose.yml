@@ -150,6 +150,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    volumes:
+      - //var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -165,7 +167,6 @@ services:
     build: ./functions/carbon-calculator
     container_name: carbon-calculator
     environment:
-      # pass value to the function
       intensity_factor: "0.90"
 
   # 9. RabbitMQ
@@ -179,8 +180,8 @@ services:
       test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
       interval: 10s
       timeout: 5s
-      retries: 10 # Increase this to 10 (100 seconds total)
-      start_period: 30s # Give it a 30s grace period before starting checks
+      retries: 10 
+      start_period: 30s 
 
   # 10. NotificationService (Microservice #4)
   notification-service:

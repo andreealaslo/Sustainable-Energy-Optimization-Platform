@@ -11,10 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
-/**
- * Listens to RabbitMQ for both alerts and chart refreshes,
- * and broadcasts them dynamically to the frontend via WebSockets.
- */
+
 @Service
 @Slf4j
 public class RabbitConsumer {
@@ -26,10 +23,7 @@ public class RabbitConsumer {
         this.messagingTemplate = messagingTemplate;
     }
 
-    /**
-     * Listens to 'alert-exchange' for BOTH 'alert.red' and 'chart.refresh' routing keys.
-     * Everything is processed through the same pipeline, letting the UI decide how to show it.
-     */
+    
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(value = "alert-queue", durable = "true"),
             exchange = @Exchange(value = "alert-exchange", type = "topic", durable = "true"),
@@ -40,8 +34,8 @@ public class RabbitConsumer {
         log.info("Notification Service received event [{}] from RabbitMQ: {}", eventType, eventData);
 
         // --- THE DYNAMIC WEBSOCKET PUSH ---
-        // We push everything to "/topic/notifications". 
-        // The frontend inspects the payload's "type" property to differentiate.
+        //push everything to "/topic/notifications". 
+        //frontend inspects the payload's "type" property to differentiate.
         try {
             messagingTemplate.convertAndSend("/topic/notifications", eventData);
             log.info("Successfully broadcast event [{}] to WebSocket subscribers.", eventType);

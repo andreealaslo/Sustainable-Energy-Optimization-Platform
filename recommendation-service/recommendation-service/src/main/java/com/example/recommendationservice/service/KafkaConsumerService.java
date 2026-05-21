@@ -105,18 +105,18 @@ public class KafkaConsumerService {
             log.info(msg);
             log.info("Advice: {}", advice != null ? advice : "No advice provided by FaaS.");
 
-            // Uses routing key alert.red for the loud UI popup
+            
             rabbitTemplate.convertAndSend("alert-exchange", "alert.red", alertPayload);
 
         } else {
-            // Set up messages for the non-alerting states
+            
             if (gridIndex.equalsIgnoreCase("low") || gridIndex.equalsIgnoreCase("very low")) {
                 recommendation.setRecommendationMessage("Your usage is highly efficient.");
             } else {
                 recommendation.setRecommendationMessage("Moderate usage detected. Consider small optimizations.");
             }
 
-            // Construct a lightweight Silent Refresh Payload
+            
             java.util.Map<String, Object> refreshPayload = new java.util.HashMap<>();
             refreshPayload.put("type", "DATA_REFRESH");
             refreshPayload.put("propertyId", event.getPropertyId());
@@ -130,7 +130,6 @@ public class KafkaConsumerService {
 
             log.info("Advice: {}", advice != null ? advice : "No advice provided by FaaS.");
             log.info("Publishing SILENT Data Refresh to RabbitMQ for chart update...");
-            // Use a separate routing key (e.g., chart.refresh) so the UI can separate the intents
             rabbitTemplate.convertAndSend("alert-exchange", "chart.refresh", refreshPayload);
         }
 
