@@ -12,11 +12,12 @@ def handle(req):
     try:
         data = json.loads(req) if req else {}
         kwh = data.get("kwh", 0)
+        
+       
         now = datetime.now(timezone.utc)
         grid_index = "unknown"
-        
         cached_data = None
-        # --- READ CACHE FROM FILE ---
+        
         if os.path.exists(CACHE_FILE):
             try:
                 with open(CACHE_FILE, 'r') as f:
@@ -42,7 +43,6 @@ def handle(req):
             grid_index = cached_data.get("grid_index", "unknown")
             data_source = "National Grid Live API (Global Cache)"
         else:
-            # --- FETCH FRESH DATA ---
             now_ts = now.strftime('%Y-%m-%dT%H:%MZ')
             url = f"{BASE_URL}/intensity/{now_ts}/fw24h"
             response = requests.get(url, timeout=5, headers={'Accept': 'application/json'})
@@ -51,14 +51,21 @@ def handle(req):
                 forecast_list = response.json().get('data', [])
                 current_block = forecast_list[0]['intensity']
                 live_intensity = current_block.get('actual') or current_block.get('forecast')
-                grid_index = current_block.get('index', 'unknown') # <--- Get 'low', 'moderate', 'high', etc.
-                
+                grid_index = current_block.get('index', 'unknown')
+    
                 best_block = min(forecast_list, key=lambda x: x['intensity']['forecast'])
-                best_time = best_block['from'].split('T')[1][:5]
+                raw_from_str = best_block['from'].replace('Z', '+00:00')
+                best_dt_utc = datetime.fromisoformat(raw_from_str)
+
+                romanian_offset = timezone(timedelta(hours=3))
+                best_dt_ro = best_dt_utc.astimezone(romanian_offset)
+    
+    
+                formatted_window = best_dt_ro.strftime('%d.%m.%Y at %H:%M')
+    
                 low_val = best_block['intensity']['forecast']
-                advice = f"Greenest window detected at {best_time} ({low_val} gCO2/kWh). Shifting loads to this time reduces footprint."
+                advice = f"Greenest window detected on {formatted_window} ({low_val} gCO2/kWh). Shifting loads to this time reduces footprint."
                 
-                # --- SAVE TO FILE CACHE ---
                 with open(CACHE_FILE, 'w') as f:
                     json.dump({
                         "timestamp": now.isoformat(),
@@ -68,6 +75,7 @@ def handle(req):
                         "block_from": forecast_list[0]['from'],
                         "block_to": forecast_list[0]['to']
                     }, f)
+                
                 data_source = "National Grid Live API (Fresh)"
             else:
                 live_intensity = 450

@@ -29,16 +29,24 @@ public class KafkaConsumerService {
     private final RabbitTemplate rabbitTemplate;
     private final DockerTelemetryReader telemetryReader;
 
+    private static volatile boolean sustainableModeActive = true;
+
     @Value("${FAAS_URL:http://carbon-calculator:8080}")
     private String faasUrl;
 
     @Autowired
     public KafkaConsumerService(RecommendationRepository repository, RestTemplate restTemplate,
-                                RabbitTemplate rabbitTemplate, DockerTelemetryReader telemetryReader) {
+            RabbitTemplate rabbitTemplate, DockerTelemetryReader telemetryReader) {
         this.repository = repository;
         this.restTemplate = restTemplate;
         this.rabbitTemplate = rabbitTemplate;
         this.telemetryReader = telemetryReader;
+    }
+
+    public static boolean isSustainableModeActive() { return sustainableModeActive; }
+   
+    public static void setSustainableModeActive(boolean active) {
+        sustainableModeActive = active;
     }
 
     @KafkaListener(topics = "raw-consumption-events", groupId = "recommendation-group")
@@ -51,38 +59,96 @@ public class KafkaConsumerService {
         recommendation.setPropertyId(event.getPropertyId());
         recommendation.setKwhUsed(event.getKwhUsed());
         recommendation.setCreatedAt(LocalDateTime.now());
-        
+
         String gridIndex = "unknown";
         String advice = null;
         double liveGridIntensity = 150.0; // Default fallback constant
 
         // --- STEP 1: CALL PYTHON FAAS ---
         try {
-            log.info("Requesting calculation from FaaS: {}", faasUrl);
-            Map<String, Object> requestPayload = Map.of("kwh", event.getKwhUsed());
+            if (sustainableModeActive) {
+                log.info("Requesting calculation from FaaS: {}", faasUrl);
 
-            Map<String, Object> response = restTemplate.postForObject(faasUrl, requestPayload, Map.class);
-            if (response == null) {
-                log.warn("FaaS returned null response");
-            } else if (!response.containsKey("carbonScore")) {
-                log.warn("FaaS returned unexpected body: {}", response);
-            }
+                Map<String, Object> requestPayload = Map.of(
+                        "kwh", event.getKwhUsed());
 
-            if (response != null && response.containsKey("carbonScore")) {
-                Double score = Double.valueOf(response.get("carbonScore").toString());
-                String dataSource = response.get("dataSource").toString();
-                gridIndex = response.get("gridIndex").toString();
-                
-                if (response.containsKey("advice")) {
-                    advice = response.get("advice").toString();
+                Map<String, Object> response = restTemplate.postForObject(faasUrl, requestPayload, Map.class);
+                if (response == null) {
+                    log.warn("FaaS returned null response");
+                } else if (!response.containsKey("carbonScore")) {
+                    log.warn("FaaS returned unexpected body: {}", response);
                 }
-                if (response.containsKey("intensityUsed")) {
-                    liveGridIntensity = Double.valueOf(response.get("intensityUsed").toString());
+
+                if (response != null && response.containsKey("carbonScore")) {
+                    Double score = Double.valueOf(response.get("carbonScore").toString());
+                    String dataSource = response.get("dataSource").toString();
+                    gridIndex = response.get("gridIndex").toString();
+
+                    if (response.containsKey("advice")) {
+                        advice = response.get("advice").toString();
+                    }
+                    if (response.containsKey("intensityUsed")) {
+                        liveGridIntensity = Double.valueOf(response.get("intensityUsed").toString());
+                    }
+
+                    recommendation.setCarbonScore(score);
+                    recommendation.setStatus(gridIndex);
+                    log.info("FaaS returned Carbon Score: {} and Grid Index: {} (Data Source: {})", score, gridIndex,
+                            dataSource);
                 }
+            } else {
                 
-                recommendation.setCarbonScore(score);
-                recommendation.setStatus(gridIndex);
-                log.info("FaaS returned Carbon Score: {} and Grid Index: {} (Data Source: {})", score, gridIndex, dataSource);
+                log.warn(
+                        "!!! LEGACY MODE ACTIVE !!! Bypassing FaaS layer. Forcing raw direct external API handshake...");
+
+                java.time.ZonedDateTime nowUtc = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
+                String nowTs = nowUtc.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm'Z'"));
+                String externalUrl = "https://api.carbonintensity.org.uk/intensity/" + nowTs + "/fw24h";
+
+                
+                Map<String, Object> externalResponse = restTemplate.getForObject(externalUrl, Map.class);
+
+                if (externalResponse != null && externalResponse.containsKey("data")) {
+                    java.util.List<?> dataList = (java.util.List<?>) externalResponse.get("data");
+                    if (!dataList.isEmpty()) {
+                        Map<String, Object> firstBlock = (Map<String, Object>) dataList.get(0);
+                        Map<String, Object> intensityMap = (Map<String, Object>) firstBlock.get("intensity");
+
+                        Object actualIntensity = intensityMap.get("actual");
+                        Object forecastIntensity = intensityMap.get("forecast");
+                        liveGridIntensity = actualIntensity != null ? Double.valueOf(actualIntensity.toString())
+                                : Double.valueOf(forecastIntensity.toString());
+                        gridIndex = intensityMap.get("index").toString();
+
+                        Map<String, Object> bestBlock = dataList.stream()
+                                .map(x -> (Map<String, Object>) x)
+                                .min(java.util.Comparator.comparingDouble(x -> Double.valueOf(
+                                        ((Map<String, Object>) x.get("intensity")).get("forecast").toString())))
+                                .orElse((Map<String, Object>) firstBlock);
+
+                        String bestTimeRaw = bestBlock.get("from").toString(); // e.g. "2026-05-26T13:00Z"
+                        java.time.ZonedDateTime bestUtc = java.time.ZonedDateTime.parse(
+                                bestTimeRaw.replace("Z", "+00:00"),
+                                java.time.format.DateTimeFormatter.ISO_ZONED_DATE_TIME);
+                        java.time.ZonedDateTime bestRo = bestUtc
+                                .withZoneSameInstant(java.time.ZoneId.of("Europe/Bucharest"));
+                        String formattedWindow = bestRo
+                                .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy 'at' HH:mm"));
+
+                        Object lowVal = ((Map<String, Object>) bestBlock.get("intensity")).get("forecast");
+                        advice = "Greenest window detected on " + formattedWindow + " (" + lowVal
+                                + " gCO2/kWh). Shifting loads to this time reduces footprint.";
+
+                        double factor = liveGridIntensity / 1000.0;
+                        double score = Math.round((event.getKwhUsed() * factor) * 10000.0) / 10000.0;
+
+                        recommendation.setCarbonScore(score);
+                        recommendation.setStatus(gridIndex);
+                        log.info(
+                                "Direct External API returned Intensity: {} and Grid Index: {} (Data Source: Cache Bypassed Direct API)",
+                                liveGridIntensity, gridIndex);
+                    }
+                }
             }
         } catch (Exception e) {
             log.error("FaaS communication failed! Using local fallback. Error: {}", e.getMessage());
@@ -91,7 +157,8 @@ public class KafkaConsumerService {
         }
 
         // --- STEP 2: CRITICAL FIX - SAVE TO DATABASE FIRST ---
-        // This ensures data is fully committed BEFORE the frontend is notified to refresh its chart
+        // This ensures data is fully committed BEFORE the frontend is notified to
+        // refresh its chart
         repository.save(recommendation);
         log.info("Recommendation successfully saved to database with status: {}", recommendation.getStatus());
 
@@ -112,17 +179,17 @@ public class KafkaConsumerService {
             String logMsg = gridIndex.equalsIgnoreCase("very high")
                     ? "Publishing VERY HIGH Alert to RabbitMQ exchange..."
                     : "Publishing HIGH Alert to RabbitMQ exchange...";
-            
+
             if (gridIndex.equalsIgnoreCase("very high")) {
                 recommendation.setRecommendationMessage("Very high usage detected! Reduce load immediately!");
             } else {
                 recommendation.setRecommendationMessage("High usage detected! Consider reducing load immediately.");
             }
-            
+
             notificationPayload.put("type", "ALERT");
             log.info(logMsg);
             log.info("Advice: {}", advice != null ? advice : "No advice provided by FaaS.");
-            
+
             rabbitTemplate.convertAndSend("alert-exchange", "alert.red", notificationPayload);
         } else {
             if (gridIndex.equalsIgnoreCase("low") || gridIndex.equalsIgnoreCase("very low")) {
@@ -134,32 +201,37 @@ public class KafkaConsumerService {
             notificationPayload.put("type", "DATA_REFRESH");
             log.info("Advice: {}", advice != null ? advice : "No advice provided by FaaS.");
             log.info("Publishing SILENT Data Refresh to RabbitMQ for instant chart update...");
-            
+
             rabbitTemplate.convertAndSend("alert-exchange", "chart.refresh", notificationPayload);
         }
 
         // --- STEP 4: GREEN-OPS SUSTAINABILITY TELEMETRY ---
         try {
             long durationMs = System.currentTimeMillis() - startTime;
-            Map<String, Double> clusterCpu = telemetryReader.getLiveClusterCpu();
+            Map<String, Double> clusterCpu = telemetryReader.getLiveClusterCpu(sustainableModeActive);
             double totalCpuPercent = clusterCpu.values().stream().mapToDouble(Double::doubleValue).sum();
-            
-            double baselineWatts = 15.0; 
+
+            double baselineWatts = 15.0;
             double dynamicMaxWatts = 45.0;
             double structuralWatts = baselineWatts + (Math.min(totalCpuPercent / 100.0, 1.0) * dynamicMaxWatts);
-            
+
             double runDurationHours = (double) durationMs / 3600000.0;
             double structuralEnergyKwh = (structuralWatts / 1000.0) * runDurationHours;
             double infrastructureCarbonMg = structuralEnergyKwh * liveGridIntensity * 1000.0;
 
             SystemTelemetry telemetryPayload = new SystemTelemetry();
-            telemetryPayload.setContainerCpuMetrics(clusterCpu);
+
+            // Inject an optimization state flag so the frontend can display the mode status
+            Map<String, Double> modifiableCpuMap = new HashMap<>(clusterCpu);
+            modifiableCpuMap.put("_optimization_state", sustainableModeActive ? 1.0 : 0.0);
+
+            telemetryPayload.setContainerCpuMetrics(modifiableCpuMap);
             telemetryPayload.setTotalPowerWatts(structuralWatts);
             telemetryPayload.setCarbonOverheadMg(infrastructureCarbonMg);
 
             log.info("-> DEBUG RAW CLUSTER METRICS MAP: {}", telemetryPayload.getContainerCpuMetrics());
 
-            log.info("Infrastructure Telemetry Dispatched - Load: {} W, Footprint: {} mg CO2", 
+            log.info("Infrastructure Telemetry Dispatched - Load: {} W, Footprint: {} mg CO2",
                     String.format("%.2f", structuralWatts), String.format("%.4f", infrastructureCarbonMg));
 
             rabbitTemplate.convertAndSend("alert-exchange", "telemetry.update", telemetryPayload);
@@ -167,5 +239,6 @@ public class KafkaConsumerService {
         } catch (Exception ex) {
             log.error("Failed to capture infrastructure system telemetry package: {}", ex.getMessage());
         }
+
     }
 }
