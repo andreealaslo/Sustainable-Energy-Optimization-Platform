@@ -118,7 +118,8 @@ public class KafkaConsumerService {
                         Object forecastIntensity = intensityMap.get("forecast");
                         liveGridIntensity = actualIntensity != null ? Double.valueOf(actualIntensity.toString())
                                 : Double.valueOf(forecastIntensity.toString());
-                        gridIndex = intensityMap.get("index").toString();
+                        /*gridIndex = intensityMap.get("index").toString(); */ 
+                        gridIndex = "high";
 
                         Map<String, Object> bestBlock = dataList.stream()
                                 .map(x -> (Map<String, Object>) x)
@@ -156,16 +157,34 @@ public class KafkaConsumerService {
             recommendation.setStatus("fallback");
         }
 
-        // --- STEP 2: CRITICAL FIX - SAVE TO DATABASE FIRST ---
+        
+
+        // --- STEP 2: ASYNCHRONOUS NOTIFICATION ROUTING ---
+        boolean isAlert = gridIndex.equalsIgnoreCase("high") || gridIndex.equalsIgnoreCase("very high");
+        Map<String, Object> notificationPayload = new HashMap<>();
+
+        if(isAlert) {
+            if (gridIndex.equalsIgnoreCase("very high")) {
+                recommendation.setRecommendationMessage("Very high usage detected! Reduce load immediately!");
+            } else {
+                recommendation.setRecommendationMessage("High usage detected! Consider reducing load immediately.");
+            }
+            notificationPayload.put("type", "ALERT");
+        } else {
+            if (gridIndex.equalsIgnoreCase("low") || gridIndex.equalsIgnoreCase("very low")) {
+                recommendation.setRecommendationMessage("Your usage is highly efficient.");
+            } else {
+                recommendation.setRecommendationMessage("Moderate usage detected. Consider small optimizations.");
+            }
+            notificationPayload.put("type", "DATA_REFRESH");
+        }
+
+        // --- STEP 3: CRITICAL FIX - SAVE TO DATABASE FIRST ---
         // This ensures data is fully committed BEFORE the frontend is notified to
         // refresh its chart
         repository.save(recommendation);
         log.info("Recommendation successfully saved to database with status: {}", recommendation.getStatus());
 
-        // --- STEP 3: ASYNCHRONOUS NOTIFICATION ROUTING ---
-        boolean isAlert = gridIndex.equalsIgnoreCase("high") || gridIndex.equalsIgnoreCase("very high");
-
-        Map<String, Object> notificationPayload = new HashMap<>();
         notificationPayload.put("propertyId", event.getPropertyId());
         notificationPayload.put("kwhUsed", event.getKwhUsed());
         notificationPayload.put("carbonScore", recommendation.getCarbonScore());
@@ -174,34 +193,13 @@ public class KafkaConsumerService {
         if (advice != null) {
             notificationPayload.put("advice", advice);
         }
-
+        log.info("Advice: {}", advice != null ? advice : "No advice provided by FaaS.");
         if (isAlert) {
-            String logMsg = gridIndex.equalsIgnoreCase("very high")
-                    ? "Publishing VERY HIGH Alert to RabbitMQ exchange..."
-                    : "Publishing HIGH Alert to RabbitMQ exchange...";
-
-            if (gridIndex.equalsIgnoreCase("very high")) {
-                recommendation.setRecommendationMessage("Very high usage detected! Reduce load immediately!");
-            } else {
-                recommendation.setRecommendationMessage("High usage detected! Consider reducing load immediately.");
-            }
-
-            notificationPayload.put("type", "ALERT");
-            log.info(logMsg);
             log.info("Advice: {}", advice != null ? advice : "No advice provided by FaaS.");
-
             rabbitTemplate.convertAndSend("alert-exchange", "alert.red", notificationPayload);
+
         } else {
-            if (gridIndex.equalsIgnoreCase("low") || gridIndex.equalsIgnoreCase("very low")) {
-                recommendation.setRecommendationMessage("Your usage is highly efficient.");
-            } else {
-                recommendation.setRecommendationMessage("Moderate usage detected. Consider small optimizations.");
-            }
-
-            notificationPayload.put("type", "DATA_REFRESH");
-            log.info("Advice: {}", advice != null ? advice : "No advice provided by FaaS.");
             log.info("Publishing SILENT Data Refresh to RabbitMQ for instant chart update...");
-
             rabbitTemplate.convertAndSend("alert-exchange", "chart.refresh", notificationPayload);
         }
 
