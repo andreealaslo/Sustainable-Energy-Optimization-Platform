@@ -13,24 +13,28 @@ def handle(req):
         data = json.loads(req) if req else {}
         kwh = data.get("kwh", 0)
         
-       
-        now = datetime.now(timezone.utc)
+        romanian_offset = timezone(timedelta(hours=3))
+        now_ro = datetime.now(romanian_offset)
+        
         grid_index = "unknown"
         cached_data = None
         
+        # --- READ CACHE FROM FILE ---
         if os.path.exists(CACHE_FILE):
             try:
                 with open(CACHE_FILE, 'r') as f:
                     cache_content = json.load(f)
                     last_fetch = datetime.fromisoformat(cache_content['timestamp'])
-                    if (now - last_fetch) < CACHE_DURATION:
+                    
+                    if (now_ro - last_fetch) < CACHE_DURATION:
                         block_from = cache_content.get('block_from')
                         block_to = cache_content.get('block_to')
                         if block_from and block_to:
                             try:
-                                block_from_dt = datetime.fromisoformat(block_from.replace('Z', '+00:00'))
-                                block_to_dt = datetime.fromisoformat(block_to.replace('Z', '+00:00'))
-                                if block_from_dt <= now < block_to_dt:
+                                block_from_dt = datetime.fromisoformat(block_from)
+                                block_to_dt = datetime.fromisoformat(block_to)
+                                
+                                if block_from_dt <= now_ro.replace(tzinfo=None) < block_to_dt:
                                     cached_data = cache_content
                             except Exception:
                                 pass
@@ -43,7 +47,8 @@ def handle(req):
             grid_index = cached_data.get("grid_index", "unknown")
             data_source = "National Grid Live API (Global Cache)"
         else:
-            now_ts = now.strftime('%Y-%m-%dT%H:%MZ')
+            now_ts = now_ro.strftime('%Y-%m-%dT%H:%MZ')
+            
             url = f"{BASE_URL}/intensity/{now_ts}/fw24h"
             response = requests.get(url, timeout=5, headers={'Accept': 'application/json'})
             
@@ -54,26 +59,26 @@ def handle(req):
                 grid_index = current_block.get('index', 'unknown')
     
                 best_block = min(forecast_list, key=lambda x: x['intensity']['forecast'])
-                raw_from_str = best_block['from'].replace('Z', '+00:00')
-                best_dt_utc = datetime.fromisoformat(raw_from_str)
-
-                romanian_offset = timezone(timedelta(hours=3))
-                best_dt_ro = best_dt_utc.astimezone(romanian_offset)
-    
-    
-                formatted_window = best_dt_ro.strftime('%d.%m.%Y at %H:%M')
+                
+                raw_from_str = best_block['from'].replace('Z', '')
+                best_dt_local = datetime.fromisoformat(raw_from_str)
+                formatted_window = best_dt_local.strftime('%d.%m.%Y at %H:%M')
     
                 low_val = best_block['intensity']['forecast']
                 advice = f"Greenest window detected on {formatted_window} ({low_val} gCO2/kWh). Shifting loads to this time reduces footprint."
                 
+                block_from_naive = forecast_list[0]['from'].replace('Z', '')
+                block_to_naive = forecast_list[0]['to'].replace('Z', '')
+
+            
                 with open(CACHE_FILE, 'w') as f:
                     json.dump({
-                        "timestamp": now.isoformat(),
+                        "timestamp": now_ro.isoformat(),
                         "live_intensity": live_intensity,
                         "advice": advice,
                         "grid_index": grid_index,
-                        "block_from": forecast_list[0]['from'],
-                        "block_to": forecast_list[0]['to']
+                        "block_from": block_from_naive,
+                        "block_to": block_to_naive
                     }, f)
                 
                 data_source = "National Grid Live API (Fresh)"
@@ -93,7 +98,7 @@ def handle(req):
             "advice": advice,
             "gridIndex": grid_index,
             "dataSource": data_source,
-            "calculationTimestamp": now.strftime('%Y-%m-%dT%H:%MZ'),
+            "calculationTimestamp": now_ro.strftime('%Y-%m-%dT%H:%MZ'),
             "engine": "OpenFaaS-Carbon-Intelligence"
         })
 
