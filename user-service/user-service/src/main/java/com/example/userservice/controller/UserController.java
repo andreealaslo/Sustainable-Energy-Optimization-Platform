@@ -74,7 +74,6 @@ public class UserController {
         return userRepository.findById(authId).map(user -> {
             property.setOwner(user);
 
-            //if propertyID is not passed, a random one is generated
             if (property.getPropertyId() == null || property.getPropertyId().isBlank()) {
                 property.setPropertyId("METER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
             }

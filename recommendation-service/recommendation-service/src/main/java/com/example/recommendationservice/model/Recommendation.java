@@ -11,9 +11,7 @@ public class Recommendation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    // Links this recommendation to the specific ConsumptionRecord ID from the Billing Service
     private Long sourceConsumptionId;
-
     private String propertyId;
     private Double kwhUsed;
     private Double carbonScore;

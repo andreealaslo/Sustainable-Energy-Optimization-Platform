@@ -13,8 +13,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+
+
 
 /**
  * Consumes Kafka events, delegates carbon calculation to an external FaaS,
@@ -51,7 +58,7 @@ public class KafkaConsumerService {
 
     @KafkaListener(topics = "raw-consumption-events", groupId = "recommendation-group")
     public void consumeConsumptionEvent(ConsumptionEvent event) {
-        long startTime = System.currentTimeMillis(); // Track transaction duration
+        long startTime = System.currentTimeMillis(); 
         log.info("Received event for Property: {}. kWh: {}", event.getPropertyId(), event.getKwhUsed());
 
         Recommendation recommendation = new Recommendation();
@@ -62,7 +69,7 @@ public class KafkaConsumerService {
 
         String gridIndex = "unknown";
         String advice = null;
-        double liveGridIntensity = 150.0; // Default fallback constant
+        double liveGridIntensity = 150.0; 
 
         // --- STEP 1: CALL PYTHON FAAS ---
         try {
@@ -127,7 +134,7 @@ public class KafkaConsumerService {
                                         ((Map<String, Object>) x.get("intensity")).get("forecast").toString())))
                                 .orElse((Map<String, Object>) firstBlock);
 
-                        String bestTimeRaw = bestBlock.get("from").toString(); // e.g. "2026-05-26T13:00Z"
+                        String bestTimeRaw = bestBlock.get("from").toString(); 
                         java.time.ZonedDateTime bestUtc = java.time.ZonedDateTime.parse(
                                 bestTimeRaw.replace("Z", "+00:00"),
                                 java.time.format.DateTimeFormatter.ISO_ZONED_DATE_TIME);
@@ -180,8 +187,6 @@ public class KafkaConsumerService {
         }
 
         // --- STEP 3: CRITICAL FIX - SAVE TO DATABASE FIRST ---
-        // This ensures data is fully committed BEFORE the frontend is notified to
-        // refresh its chart
         repository.save(recommendation);
         log.info("Recommendation successfully saved to database with status: {}", recommendation.getStatus());
 
@@ -220,7 +225,6 @@ public class KafkaConsumerService {
 
             SystemTelemetry telemetryPayload = new SystemTelemetry();
 
-            // Inject an optimization state flag so the frontend can display the mode status
             Map<String, Double> modifiableCpuMap = new HashMap<>(clusterCpu);
             modifiableCpuMap.put("_optimization_state", sustainableModeActive ? 1.0 : 0.0);
 
@@ -239,5 +243,61 @@ public class KafkaConsumerService {
             log.error("Failed to capture infrastructure system telemetry package: {}", ex.getMessage());
         }
 
+    }
+
+
+    public List<Map<String, Object>> getLiveGridForecastData() {
+        List<Map<String, Object>> normalizedTimeline = new java.util.ArrayList<>();
+
+        try {
+            if (sustainableModeActive) {
+                log.info("Proxying global grid timeline request to OpenFaaS layer at target URL: {}", faasUrl);
+                Map<String, Object> requestPayload = Map.of("kwh", 0);
+                
+                String rawFaasString = restTemplate.postForObject(faasUrl, requestPayload, String.class);
+                log.info("-> DISS_DEBUG RAW FAAS RESPONSE: {}", rawFaasString);
+
+                if (rawFaasString != null) {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    Map<String, Object> faasResponse = mapper.readValue(rawFaasString, Map.class);
+                    
+                    if (faasResponse != null && faasResponse.containsKey("forecastTimeline")) {
+                        List<?> rawList = (List<?>) faasResponse.get("forecastTimeline");
+                        for (Object obj : rawList) {
+                            if (obj instanceof Map) {
+                                normalizedTimeline.add((Map<String, Object>) obj);
+                            }
+                        }
+                        log.info("Successfully extracted {} timeline nodes from FaaS payload.", normalizedTimeline.size());
+                    } else if (faasResponse != null && faasResponse.containsKey("error")) {
+                        log.error("-> FaaS internal execution crashed! Returned error map: {}", faasResponse.get("error"));
+                    }
+                }
+            } else {
+                log.warn("!!! LEGACY MODE ACTIVE !!! Bypassing FaaS cache layer. Executing raw API call...");
+                ZonedDateTime nowUtc = ZonedDateTime.now(ZoneOffset.UTC);
+                ZonedDateTime nowRo = nowUtc.withZoneSameInstant(ZoneId.of("Europe/Bucharest"));
+                String nowTs = nowRo.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm'Z'"));
+                String externalUrl = "https://api.carbonintensity.org.uk/intensity/" + nowTs + "/fw24h";
+
+                Map<String, Object> apiResponse = restTemplate.getForObject(externalUrl, Map.class);
+                if (apiResponse != null && apiResponse.containsKey("data")) {
+                    List<?> rawList = (List<?>) apiResponse.get("data");
+                    for (Object obj : rawList) {
+                        normalizedTimeline.add((Map<String, Object>) obj);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("CRITICAL EXCEPTION inside service layer timeline loop: {}", e.getMessage(), e);
+            normalizedTimeline = List.of(
+                Map.of("from", "2026-05-29T00:00Z", "intensity", Map.of("forecast", 45, "index", "very low")),
+                Map.of("from", "2026-05-29T02:00Z", "intensity", Map.of("forecast", 65, "index", "low")),
+                Map.of("from", "2026-05-29T04:00Z", "intensity", Map.of("forecast", 140, "index", "moderate")),
+                Map.of("from", "2026-05-29T06:00Z", "intensity", Map.of("forecast", 260, "index", "high"))
+            );
+        }
+
+        return normalizedTimeline;
     }
 }

@@ -8,7 +8,6 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitConfig {
 
-    // This bean tells Spring to expect JSON and convert it back to a Map/Object
     @Bean
     public MessageConverter jsonMessageConverter() {
         return new Jackson2JsonMessageConverter();

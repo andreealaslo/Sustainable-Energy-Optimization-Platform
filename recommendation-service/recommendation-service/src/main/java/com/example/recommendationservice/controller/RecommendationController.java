@@ -18,10 +18,12 @@ import java.util.Map;
 public class RecommendationController {
 
     private final RecommendationRepository repository;
+    private final KafkaConsumerService consumerService;
 
     @Autowired
-    public RecommendationController(RecommendationRepository repository) {
+    public RecommendationController(RecommendationRepository repository, KafkaConsumerService consumerService) {
         this.repository = repository;
+        this.consumerService = consumerService;
     }
 
     @GetMapping("/health")
@@ -37,13 +39,8 @@ public class RecommendationController {
         if (isSustainable) {
             return ResponseEntity.ok(repository.findByPropertyId(propertyId));
         } else {
-           
             log.warn("!!! LEGACY MODE ACTIVE !!! Triggering N+1 Database query degradation loops...");
-
-           
             List<Recommendation> allRecords = repository.findAll();
-
-           
             List<Recommendation> filteredResults = new java.util.ArrayList<>();
             for (Recommendation rec : allRecords) {
                 if (rec.getPropertyId().equals(propertyId)) {
@@ -54,7 +51,6 @@ public class RecommendationController {
                     filteredResults.add(rec);
                 }
             }
-
             return ResponseEntity.ok(filteredResults);
         }
     }
@@ -63,11 +59,16 @@ public class RecommendationController {
     @PostMapping("/telemetry-config/toggle")
     public ResponseEntity<?> toggleSustainableMode(@RequestBody Map<String, Boolean> payload) {
         boolean enableGreenMode = payload.getOrDefault("enabled", true);
-
         KafkaConsumerService.setSustainableModeActive(enableGreenMode);
-
         return ResponseEntity.ok(Map.of(
                 "status", "success",
                 "sustainableModeActive", enableGreenMode));
+    }
+
+    @GetMapping("/grid-forecast")
+    public ResponseEntity<List<Map<String, Object>>> getLiveGridForecast() {
+        log.info("REST Gateway Request received for live grid demand timeline map.");
+        List<Map<String, Object>> forecastTimeline = consumerService.getLiveGridForecastData();
+        return ResponseEntity.ok(forecastTimeline);
     }
 }
