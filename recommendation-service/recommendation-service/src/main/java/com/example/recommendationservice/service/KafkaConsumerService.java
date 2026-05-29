@@ -188,6 +188,7 @@ public class KafkaConsumerService {
         notificationPayload.put("propertyId", event.getPropertyId());
         notificationPayload.put("kwhUsed", event.getKwhUsed());
         notificationPayload.put("carbonScore", recommendation.getCarbonScore());
+        notificationPayload.put("recommendationMessage", recommendation.getRecommendationMessage());
         notificationPayload.put("gridIndex", gridIndex);
         notificationPayload.put("timestamp", LocalDateTime.now().toString());
         if (advice != null) {
