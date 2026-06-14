@@ -24,12 +24,6 @@ public class KafkaProducerService {
         this.kafkaTemplate = kafkaTemplate;
     }
 
-    /**
-     * Publishes a ConsumptionRecord to the Kafka topic.
-     * The key is set to the propertyId to ensure all records for a specific property
-     * go to the same Kafka partition, preserving order.
-     * @param record The ConsumptionRecord to send.
-     */
     public CompletableFuture<SendResult<String, ConsumptionRecord>> sendConsumptionEvent(
             ConsumptionRecord record) {
 

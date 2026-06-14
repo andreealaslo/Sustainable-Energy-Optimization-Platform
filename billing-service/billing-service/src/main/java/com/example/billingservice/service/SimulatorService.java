@@ -45,7 +45,7 @@ public class SimulatorService {
             } catch (Exception e) {
                 log.error("Simulator error: {}", e.getMessage(), e);
             }
-        }, 0, 30, TimeUnit.SECONDS);
+        }, 0, 15, TimeUnit.SECONDS);
 
         log.info("Simulator started for property {}", propertyId);
     }

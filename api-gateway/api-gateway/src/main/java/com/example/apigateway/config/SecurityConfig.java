@@ -8,10 +8,7 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
 
-/**
- * Custom Security Configuration for the API Gateway.
- * This ensures that public routes (like health and login) bypass Spring Security's default login form.
- */
+
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {

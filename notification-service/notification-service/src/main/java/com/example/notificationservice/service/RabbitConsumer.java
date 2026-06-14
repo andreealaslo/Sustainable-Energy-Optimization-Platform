@@ -31,11 +31,6 @@ public class RabbitConsumer {
     ))
     public void handleIncomingEvent(Map<String, Object> eventData) {
         String eventType = eventData.getOrDefault("type", "UNKNOWN").toString();
-        log.info("Notification Service received event [{}] from RabbitMQ: {}", eventType, eventData);
-
-        // --- THE DYNAMIC WEBSOCKET PUSH ---
-        //push everything to "/topic/notifications". 
-        //frontend inspects the payload's "type" property to differentiate.
         try {
             messagingTemplate.convertAndSend("/topic/notifications", eventData);
             log.info("Successfully broadcast event [{}] to WebSocket subscribers.", eventType);

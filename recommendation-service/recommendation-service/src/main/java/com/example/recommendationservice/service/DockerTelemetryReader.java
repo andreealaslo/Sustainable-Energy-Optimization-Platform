@@ -28,7 +28,7 @@ public class DockerTelemetryReader {
     private final AtomicReference<Map<String, Double>> cachedMetrics = new AtomicReference<>(new HashMap<>());
 
    
-    @Scheduled(fixedRate = 5000)
+    @Scheduled(fixedRate = 2000)
     public void pollClusterTelemetryAsync() {
         try {
             Map<String, Double> liveMetrics = fetchRawDockerMetrics();

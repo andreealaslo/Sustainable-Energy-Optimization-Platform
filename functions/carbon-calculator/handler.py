@@ -12,8 +12,6 @@ def handle(req):
     try:
         data = json.loads(req) if req else {}
         kwh = data.get("kwh", 0)
-        
-        # 1. Establish the current wall-clock time in Romania (UTC+3)
         romanian_offset = timezone(timedelta(hours=3))
         now_ro = datetime.now(romanian_offset)
         
@@ -21,14 +19,12 @@ def handle(req):
         cached_data = None
         forecast_list_data = [] 
 
-        # --- READ CACHE FROM FILE ---
         if os.path.exists(CACHE_FILE):
             try:
                 with open(CACHE_FILE, 'r') as f:
                     cache_content = json.load(f)
                     last_fetch = datetime.fromisoformat(cache_content['timestamp'])
                     
-                    # Compare cache freshness directly using Romanian local time
                     if (now_ro - last_fetch) < CACHE_DURATION:
                         block_from = cache_content.get('block_from')
                         block_to = cache_content.get('block_to')
@@ -37,7 +33,6 @@ def handle(req):
                                 block_from_dt = datetime.fromisoformat(block_from)
                                 block_to_dt = datetime.fromisoformat(block_to)
                                 
-                                # Check if current Romanian time falls squarely in the cached block window
                                 if block_from_dt <= now_ro.replace(tzinfo=None) < block_to_dt:
                                     cached_data = cache_content
                             except Exception:
@@ -52,7 +47,6 @@ def handle(req):
             forecast_list_data = cached_data.get("forecast_list", [])
             data_source = "National Grid Live API (Global Cache)"
         else:
-            # --- FORCE WALL-CLOCK ALIGNMENT WITH THE UK API ---
             now_ts = now_ro.strftime('%Y-%m-%dT%H:%MZ')
             
             url = f"{BASE_URL}/intensity/{now_ts}/fw24h"
@@ -66,7 +60,6 @@ def handle(req):
     
                 best_block = min(raw_api_data, key=lambda x: x['intensity']['forecast'])
                 
-                # --- PROCESS USER DISPLAY ADVICE ---
                 raw_from_str = best_block['from'].replace('Z', '')
                 best_dt_local = datetime.fromisoformat(raw_from_str)
                 formatted_window = best_dt_local.strftime('%d.%m.%Y at %H:%M')
@@ -74,8 +67,6 @@ def handle(req):
                 low_val = best_block['intensity']['forecast']
                 advice = f"Greenest window detected on {formatted_window} ({low_val} gCO2/kWh). Shifting loads to this time reduces footprint."
                 
-                # --- NEW CLEAN NORMALIZATION LOOP ---
-                # Explicitly parse out and build a clean tracking array to secure JSON serialization boundaries
                 for item in raw_api_data:
                     forecast_list_data.append({
                         "from": item.get("from"),
@@ -90,7 +81,6 @@ def handle(req):
                 block_from_naive = raw_api_data[0]['from'].replace('Z', '')
                 block_to_naive = raw_api_data[0]['to'].replace('Z', '')
 
-                # --- SAVE CACHE WITH EXPLICIT CLEAN PARSED FORECAST TIMELINE ---
                 with open(CACHE_FILE, 'w') as f:
                     json.dump({
                         "timestamp": now_ro.isoformat(),

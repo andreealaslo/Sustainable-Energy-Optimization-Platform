@@ -66,9 +66,13 @@ public class RecommendationController {
     }
 
     @GetMapping("/grid-forecast")
-    public ResponseEntity<List<Map<String, Object>>> getLiveGridForecast() {
+    public ResponseEntity<Map<String, Object>> getLiveGridForecast() {
         log.info("REST Gateway Request received for live grid demand timeline map.");
         List<Map<String, Object>> forecastTimeline = consumerService.getLiveGridForecastData();
-        return ResponseEntity.ok(forecastTimeline);
+        boolean cacheAndGlobal = consumerService.isCachedForecastGlobalCache();
+        return ResponseEntity.ok(Map.of(
+                "cacheAndGlobal", cacheAndGlobal,
+                "forecastTimeline", forecastTimeline
+        ));
     }
 }

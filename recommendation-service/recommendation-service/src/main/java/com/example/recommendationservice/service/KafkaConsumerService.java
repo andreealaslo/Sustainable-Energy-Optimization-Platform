@@ -37,6 +37,9 @@ public class KafkaConsumerService {
     private final DockerTelemetryReader telemetryReader;
 
     private static volatile boolean sustainableModeActive = true;
+    private static final String GLOBAL_CACHE_DATA_SOURCE = "National Grid Live API (Global Cache)";
+    private volatile List<Map<String, Object>> cachedForecastTimeline;
+    private volatile String cachedForecastDataSource;
 
     @Value("${FAAS_URL:http://carbon-calculator:8080}")
     private String faasUrl;
@@ -54,6 +57,10 @@ public class KafkaConsumerService {
    
     public static void setSustainableModeActive(boolean active) {
         sustainableModeActive = active;
+    }
+
+    public boolean isCachedForecastGlobalCache() {
+        return cachedForecastTimeline != null && GLOBAL_CACHE_DATA_SOURCE.equals(cachedForecastDataSource);
     }
 
     @KafkaListener(topics = "raw-consumption-events", groupId = "recommendation-group")
@@ -89,6 +96,7 @@ public class KafkaConsumerService {
                 if (response != null && response.containsKey("carbonScore")) {
                     Double score = Double.valueOf(response.get("carbonScore").toString());
                     String dataSource = response.get("dataSource").toString();
+                    cachedForecastDataSource = dataSource;
                     gridIndex = response.get("gridIndex").toString();
 
                     if (response.containsKey("advice")) {
@@ -125,7 +133,7 @@ public class KafkaConsumerService {
                         Object forecastIntensity = intensityMap.get("forecast");
                         liveGridIntensity = actualIntensity != null ? Double.valueOf(actualIntensity.toString())
                                 : Double.valueOf(forecastIntensity.toString());
-                        /*gridIndex = intensityMap.get("index").toString(); */ 
+                        
                         gridIndex = "high";
 
                         Map<String, Object> bestBlock = dataList.stream()
@@ -186,7 +194,7 @@ public class KafkaConsumerService {
             notificationPayload.put("type", "DATA_REFRESH");
         }
 
-        // --- STEP 3: CRITICAL FIX - SAVE TO DATABASE FIRST ---
+        // --- STEP 3: SAVE TO DATABASE  ---
         repository.save(recommendation);
         log.info("Recommendation successfully saved to database with status: {}", recommendation.getStatus());
 
@@ -205,7 +213,6 @@ public class KafkaConsumerService {
             rabbitTemplate.convertAndSend("alert-exchange", "alert.red", notificationPayload);
 
         } else {
-            log.info("Publishing SILENT Data Refresh to RabbitMQ for instant chart update...");
             rabbitTemplate.convertAndSend("alert-exchange", "chart.refresh", notificationPayload);
         }
 
@@ -226,8 +233,6 @@ public class KafkaConsumerService {
             SystemTelemetry telemetryPayload = new SystemTelemetry();
 
             Map<String, Double> modifiableCpuMap = new HashMap<>(clusterCpu);
-            modifiableCpuMap.put("_optimization_state", sustainableModeActive ? 1.0 : 0.0);
-
             telemetryPayload.setContainerCpuMetrics(modifiableCpuMap);
             telemetryPayload.setTotalPowerWatts(structuralWatts);
             telemetryPayload.setCarbonOverheadMg(infrastructureCarbonMg);
@@ -247,30 +252,48 @@ public class KafkaConsumerService {
 
 
     public List<Map<String, Object>> getLiveGridForecastData() {
-        List<Map<String, Object>> normalizedTimeline = new java.util.ArrayList<>();
+        boolean cachedAndGlobal = cachedForecastTimeline != null && "National Grid Live API (Global Cache)".equals(cachedForecastDataSource);
 
+        if (sustainableModeActive && cachedAndGlobal) {
+            log.info("Returning cached forecast timeline from local async cache [source={}]", cachedForecastDataSource);
+            return cachedForecastTimeline;
+        }
+
+        List<Map<String, Object>> normalizedTimeline = new java.util.ArrayList<>();
         try {
             if (sustainableModeActive) {
-                log.info("Proxying global grid timeline request to OpenFaaS layer at target URL: {}", faasUrl);
-                Map<String, Object> requestPayload = Map.of("kwh", 0);
-                
-                String rawFaasString = restTemplate.postForObject(faasUrl, requestPayload, String.class);
-                log.info("-> DISS_DEBUG RAW FAAS RESPONSE: {}", rawFaasString);
+                synchronized (this) {
+                    boolean cachedGlobalNow = cachedForecastTimeline != null && "National Grid Live API (Global Cache)".equals(cachedForecastDataSource);
+                    if (cachedGlobalNow) {
+                        log.info("Returning cached forecast timeline from local async cache [source={}]", cachedForecastDataSource);
+                        return cachedForecastTimeline;
+                    }
 
-                if (rawFaasString != null) {
-                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                    Map<String, Object> faasResponse = mapper.readValue(rawFaasString, Map.class);
+                    log.info("Proxying global grid timeline request to OpenFaaS layer at target URL: {}", faasUrl);
+                    Map<String, Object> requestPayload = Map.of("kwh", 0);
                     
-                    if (faasResponse != null && faasResponse.containsKey("forecastTimeline")) {
-                        List<?> rawList = (List<?>) faasResponse.get("forecastTimeline");
-                        for (Object obj : rawList) {
-                            if (obj instanceof Map) {
-                                normalizedTimeline.add((Map<String, Object>) obj);
+                    String rawFaasString = restTemplate.postForObject(faasUrl, requestPayload, String.class);
+                    log.info("-> DISS_DEBUG RAW FAAS RESPONSE: {}", rawFaasString);
+
+                    if (rawFaasString != null) {
+                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                        Map<String, Object> faasResponse = mapper.readValue(rawFaasString, Map.class);
+                        
+                        if (faasResponse != null && faasResponse.containsKey("forecastTimeline")) {
+                            if (faasResponse.containsKey("dataSource")) {
+                                cachedForecastDataSource = faasResponse.get("dataSource").toString();
                             }
+                            List<?> rawList = (List<?>) faasResponse.get("forecastTimeline");
+                            for (Object obj : rawList) {
+                                if (obj instanceof Map) {
+                                    normalizedTimeline.add((Map<String, Object>) obj);
+                                }
+                            }
+                            log.info("Successfully extracted {} timeline nodes from FaaS payload.", normalizedTimeline.size());
+                            cachedForecastTimeline = List.copyOf(normalizedTimeline);
+                        } else if (faasResponse != null && faasResponse.containsKey("error")) {
+                            log.error("-> FaaS internal execution crashed! Returned error map: {}", faasResponse.get("error"));
                         }
-                        log.info("Successfully extracted {} timeline nodes from FaaS payload.", normalizedTimeline.size());
-                    } else if (faasResponse != null && faasResponse.containsKey("error")) {
-                        log.error("-> FaaS internal execution crashed! Returned error map: {}", faasResponse.get("error"));
                     }
                 }
             } else {

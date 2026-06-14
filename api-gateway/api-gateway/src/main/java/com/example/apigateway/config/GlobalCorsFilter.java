@@ -14,11 +14,6 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 
-/**
- * A global WebFilter to handle CORS across all routes (YAML and Java).
- * This version uses beforeCommit to ensure that downstream microservices
- * cannot inject duplicate headers that cause browser rejection. Needed because the notification-service duplicates the headers
- */
 @Configuration
 public class GlobalCorsFilter {
 

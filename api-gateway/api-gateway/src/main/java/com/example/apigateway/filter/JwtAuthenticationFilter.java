@@ -12,11 +12,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 
-/**
- * Gateway filter to enforce JWT authentication for specified routes.
- * * It checks the Authorization header for a valid JWT and injects the userId
- * into the request header for the downstream microservice.
- */
+
 @Component
 public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAuthenticationFilter.Config> {
 
@@ -82,6 +78,6 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
     }
 
     public static class Config {
-        // Empty configuration class required by AbstractGatewayFilterFactory
+        
     }
 }

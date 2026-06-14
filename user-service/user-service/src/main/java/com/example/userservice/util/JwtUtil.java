@@ -8,9 +8,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.util.Date;
 
-/**
- * Utility class for generating JSON Web Tokens (JWT) for the UserService.
- */
+
 @Component
 public class JwtUtil {
 
@@ -25,11 +23,6 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    /**
-     * Generates a JWT for a given User.
-     * @param user The user object to generate the token for.
-     * @return The signed JWT string.
-     */
     public String generateToken(User user) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expirationMs);
